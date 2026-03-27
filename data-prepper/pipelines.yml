@@ -1,0 +1,52 @@
+# Declare sources: logs and traces, as the metrics are piped directly to Prometheus by OTel collector
+otlp-pipeline:
+  source:
+    otlp:
+      port: 21890
+      ssl: false
+  route:
+    - logs: "getEventType() == \"LOG\""
+    - traces: "getEventType() == \"TRACE\""
+  sink:
+    - pipeline:
+        name: "otel-logs-pipeline"
+        routes: ["logs"]
+    - pipeline:
+        name: "otel-traces-pipeline"
+        routes: ["traces"]
+
+otel-logs-pipeline:
+  source:
+    pipeline:
+      name: "otlp-pipeline"
+  sink:
+    - opensearch:
+        hosts: ["https://opensearch:9200"]
+        username: "admin"
+        password: "MyStr0ng!Pass#2024"
+        insecure: true
+        index_type: log-analytics-plain
+
+otel-traces-pipeline:
+  source:
+    pipeline:
+      name: "otlp-pipeline"
+  sink:
+    - pipeline:
+        name: "traces-raw-pipeline"
+
+traces-raw-pipeline:
+  source:
+    pipeline:
+      name: "otel-traces-pipeline"
+# otel_trace_raw processor — Converts OTLP trace spans into the flat document format that OpenSearch expects.
+# Each span becomes one document with fields like traceId, spanId, serviceName, durationInNanos, etc.
+  processor:
+    - otel_trace_raw:
+  sink:
+    - opensearch:
+        hosts: ["https://opensearch:9200"]
+        username: "admin"
+        password: "MyStr0ng!Pass#2024"
+        insecure: true
+        index_type: trace-analytics-plain-raw

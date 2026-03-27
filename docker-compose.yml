@@ -1,0 +1,94 @@
+services:
+  fluent-bit:
+    image: fluent/fluent-bit:${FLUENTBIT_VERSION}
+    container_name: fluent-bit
+    command:
+      - /fluent-bit/bin/fluent-bit
+      - -c
+      - /etc/fluent-bit/fluent-bit.yml
+    volumes:
+     - ./fluent-bit/fluent-bit.yml:/etc/fluent-bit/fluent-bit.yml
+     - ${DOCKER_ROOT_DIR}/containers:/var/lib/docker/containers:ro
+
+  opensearch:
+    image: ${OPENSEARCH_DOCKER_REPO}/opensearch:${OPENSEARCH_VERSION}
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD}"
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: curl -s -k -u admin:${OPENSEARCH_PASSWORD} https://localhost:9200/_cluster/health | grep -qE '"status":"(green|yellow)"'
+      start_period: 30s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  opensearch-dashboards:
+    image: ${OPENSEARCH_DOCKER_REPO}/opensearch-dashboards:${OPENSEARCH_DASHBOARDS_VERSION}
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=https://opensearch:9200
+      - OPENSEARCH_USERNAME=admin
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}
+    volumes:
+        - ./opensearch-dashboards/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION}
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-otlp-receiver
+    ports:
+     - "9090:9090"
+    volumes:
+      - prometheus-data:/prometheus # docker volume
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro # local volume
+    healthcheck:
+      test: wget -q --spider http://localhost:9090/-/healthy
+      start_period: 30s
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_CONTRIB_VERSION}
+    container_name: otel-collector
+    command:
+     - --config=/etc/otelcol-contrib/config.yml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+    volumes:
+      - ./otel-collector/config.yml:/etc/otelcol-contrib/config.yml:ro
+    healthcheck:
+      disable: true
+
+  data-prepper:
+    image: opensearchproject/data-prepper:${DATA_PREPPER_VERSION}
+    container_name: data-prepper
+    volumes:
+      - ./data-prepper/pipelines.yml:/usr/share/data-prepper/pipelines/pipelines.yml:ro
+      - ./data-prepper/data-prepper-config.yml:/usr/share/data-prepper/config/data-prepper-config.yml:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+networks:
+  default:
+    name: ${NETWORK_NAME}
+
+volumes:
+  opensearch-data:
+  prometheus-data:

@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s # how often alerting rules and recording rules are evaluated
+
+otlp:
+  promote_resource_attributes:
+    - service.name
+    - service.instance.id
+
+scrape_configs:
+  - job_name: "prometheus" # self-scraping, prometheus pulls the data. From v3 it supports pushes via otlp.
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: "otel-collector"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["otel-collector:8888"]

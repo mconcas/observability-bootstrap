@@ -1,0 +1,21 @@
+service:
+  flush: 5
+  log_level: info
+
+pipeline:
+  inputs:
+    - name: tail
+      tag: docker.*
+      path: /var/lib/docker/containers/*/*.log
+      parser: docker
+      refresh_interval: 10
+      mem_buf_limit: 50MB
+      skip_long_lines: on
+      db: /tmp/tail.db
+
+  outputs:
+    - name: opentelemetry
+      match: "*"
+      host: otel-collector
+      port: 4318
+      logs_uri: /v1/logs
