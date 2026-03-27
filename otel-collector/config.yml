@@ -14,6 +14,8 @@ processors:
   batch:
     timeout: 10s
     send_batch_size: 1024
+  resourcedetection: # not sure it is necessary at this point yet
+    detectors: [env, system]
 
 exporters:
   debug:
@@ -55,10 +57,14 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
+      processors: [resourcedetection, memory_limiter, batch]
       exporters: [otlp_grpc/data-prepper, spanmetrics, debug]
     metrics:
       receivers: [otlp, spanmetrics]
+      processors: [resourcedetection, memory_limiter, batch]
       exporters: [otlp_http/prometheus, debug]
+      # exporters: [otlp_http/prometheus, otlp_grpc/data-prepper, debug]
     logs:
       receivers: [otlp]
+      processors: [resourcedetection, memory_limiter, batch]
       exporters: [otlp_grpc/data-prepper, debug]

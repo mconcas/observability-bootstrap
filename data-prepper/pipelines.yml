@@ -19,6 +19,11 @@ otel-logs-pipeline:
   source:
     pipeline:
       name: "otlp-pipeline"
+  processor:
+    - copy_values:
+      entries:
+        - from_key: "time"
+          to_key: "@timestamp"
   sink:
     - opensearch:
         hosts: ["https://opensearch:9200"]
@@ -34,6 +39,8 @@ otel-traces-pipeline:
   sink:
     - pipeline:
         name: "traces-raw-pipeline"
+    - pipeline:
+        name: "service-map-pipeline"
 
 traces-raw-pipeline:
   source:
@@ -42,7 +49,7 @@ traces-raw-pipeline:
 # otel_trace_raw processor — Converts OTLP trace spans into the flat document format that OpenSearch expects.
 # Each span becomes one document with fields like traceId, spanId, serviceName, durationInNanos, etc.
   processor:
-    - otel_trace_raw:
+    - otel_traces:
   sink:
     - opensearch:
         hosts: ["https://opensearch:9200"]
@@ -50,3 +57,29 @@ traces-raw-pipeline:
         password: "MyStr0ng!Pass#2024"
         insecure: true
         index_type: trace-analytics-plain-raw
+
+service-map-pipeline:
+  delay: 100
+  source:
+    pipeline:
+      name: "otel-traces-pipeline"
+  processor:
+    - otel_apm_service_map:
+        window_duration: 10s
+  route:
+    - otel_apm_service_map_route: 'getEventType() == "SERVICE_MAP"'
+    - service_processed_metrics: 'getEventType() == "METRIC"'
+  sink:
+    - opensearch:
+        hosts: ["https://opensearch:9200"]
+        username: "admin"
+        password: "MyStr0ng!Pass#2024"
+        insecure: true
+        index_type: otel-v2-apm-service-map
+        routes: [otel_apm_service_map_route]
+    - prometheus:
+        url: "http://prometheus:9090/api/v1/write"
+        threshold:
+          max_events: 500
+          flush_interval: 5s
+        routes: [service_processed_metrics]

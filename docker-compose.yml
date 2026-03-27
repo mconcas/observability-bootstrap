@@ -49,6 +49,8 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --web.enable-otlp-receiver
+      - --web.enable-remote-write-receiver
+      - --storage.tsdb.retention.time=15d
     ports:
      - "9090:9090"
     volumes:

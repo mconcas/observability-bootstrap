@@ -1,1 +1,7 @@
 ssl: false
+experimental:
+  enabled_plugins:
+    processor:
+      - otel_apm_service_map
+    sink:
+      - prometheus
