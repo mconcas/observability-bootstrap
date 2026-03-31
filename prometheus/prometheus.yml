@@ -7,11 +7,27 @@ otlp:
     - service.name
     - service.instance.id
 
+storage:
+  tsdb:
+    # Accept out-of-order samples within a 30m window.
+    # Needed when Data Prepper pushes RED metrics at irregular intervals.
+    out_of_order_time_window: 30m
+
 scrape_configs:
-  - job_name: "prometheus" # self-scraping, prometheus pulls the data. From v3 it supports pushes via otlp.
+  # 1) Self-scraping — Prometheus monitors its own health
+  - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
+
+  # 2) OTel Collector internal metrics (throughput, dropped spans, etc.)
   - job_name: "otel-collector"
     scrape_interval: 10s
     static_configs:
       - targets: ["otel-collector:8888"]
+
+  # 3) Data Prepper pipeline metrics (bulk errors, buffer usage, latency)
+  - job_name: "data-prepper"
+    metrics_path: "/metrics/prometheus"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["data-prepper:4900"]

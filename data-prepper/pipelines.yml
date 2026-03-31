@@ -21,9 +21,9 @@ otel-logs-pipeline:
       name: "otlp-pipeline"
   processor:
     - copy_values:
-      entries:
-        - from_key: "time"
-          to_key: "@timestamp"
+        entries:
+          - from_key: "time"
+            to_key: "@timestamp"
   sink:
     - opensearch:
         hosts: ["https://opensearch:9200"]

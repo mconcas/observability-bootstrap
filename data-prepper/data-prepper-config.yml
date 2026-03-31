@@ -1,4 +1,5 @@
 ssl: false
+# Enable experimental APM plugins
 experimental:
   enabled_plugins:
     processor:

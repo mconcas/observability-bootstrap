@@ -18,6 +18,9 @@ services:
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
       - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD}"
+      # Master key for Direct Query datasources plugin (Prometheus, S3, etc.)
+      # Without this, OSD cannot register Prometheus as a data-connection.
+      - plugins.query.datasources.encryption.masterkey=BTqK4Ytdz67La1kShIKV3Pu9
     ports:
       - "9200:9200"
     volumes:
@@ -74,18 +77,38 @@ services:
       - "8888:8888"
     volumes:
       - ./otel-collector/config.yml:/etc/otelcol-contrib/config.yml:ro
+    depends_on:
+      data-prepper:
+        condition: service_started
+      prometheus:
+        condition: service_healthy
     healthcheck:
       disable: true
 
   data-prepper:
-    image: opensearchproject/data-prepper:${DATA_PREPPER_VERSION}
+    image: sgguruda62324/opensearch-data-prepper:${DATA_PREPPER_VERSION}
     container_name: data-prepper
     volumes:
       - ./data-prepper/pipelines.yml:/usr/share/data-prepper/pipelines/pipelines.yml:ro
-      - ./data-prepper/data-prepper-config.yml:/usr/share/data-prepper/config/data-prepper-config.yml:ro
+      - ./data-prepper/data-prepper-config.yml:/usr/share/data-prepper/config/data-prepper-config.yaml:ro
     depends_on:
       opensearch:
         condition: service_healthy
+
+  # One-shot init container: registers Prometheus data source + index patterns in OSD
+  # Uses python:3-alpine because we need both curl and python3 for JSON parsing.
+  opensearch-dashboards-init:
+    image: python:3-alpine
+    container_name: opensearch-dashboards-init
+    entrypoint: ["sh", "-c", "apk add --no-cache curl >/dev/null 2>&1 && sh /init-datasource.sh"]
+    environment:
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}
+    volumes:
+      - ./opensearch-dashboards/init-datasource.sh:/init-datasource.sh:ro
+    depends_on:
+      opensearch-dashboards:
+        condition: service_started
+    restart: "no"
 
 networks:
   default:

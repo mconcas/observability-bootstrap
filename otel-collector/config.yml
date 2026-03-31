@@ -16,10 +16,21 @@ processors:
     send_batch_size: 1024
   resourcedetection: # not sure it is necessary at this point yet
     detectors: [env, system]
+  # Transform processor: sets peer.service on CLIENT spans so that
+  # Data Prepper's otel_apm_service_map processor can build destination
+  # nodes in the Application Map topology.
+  # Without peer.service, the service map only shows source-only edges.
+  transform/peer_service:
+    trace_statements:
+      - context: span
+        statements:
+          # HTTP exporters: server.address is the hostname (e.g., "prometheus")
+          - set(attributes["peer.service"], attributes["server.address"]) where kind == SPAN_KIND_CLIENT and attributes["server.address"] != nil
+          # gRPC exporters: Go gRPC resolves hostname → IP before the span is created,
+          # so server.address is an IP. Fix by mapping the known port to the service name.
+          - set(attributes["peer.service"], "data-prepper") where kind == SPAN_KIND_CLIENT and attributes["server.port"] == 21890
 
 exporters:
-  debug:
-    verbosity: detailed
   otlp_http/prometheus:
     endpoint: http://prometheus:9090/api/v1/otlp
     tls:
@@ -45,26 +56,30 @@ service:
                 host: 0.0.0.0
                 port: 8888
     traces:
-      level: normal
+      # 'detailed' adds net.peer.name, rpc.method, rpc.service etc. to CLIENT spans.
+      # The otel_apm_service_map processor in Data Prepper needs these attributes
+      # to build destination nodes in the Application Map topology.
+      # Without them, only source-node (otelcol-contrib) appears — no arrows.
+      level: detailed
       processors:
         - batch:
             exporter:
               otlp:
                 protocol: grpc
-                endpoint: http://data-prepper:21890
+                endpoint: http://localhost:4317
                 insecure: true
 
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [resourcedetection, memory_limiter, batch]
-      exporters: [otlp_grpc/data-prepper, spanmetrics, debug]
+      processors: [resourcedetection, transform/peer_service, memory_limiter, batch]
+      exporters: [otlp_grpc/data-prepper, spanmetrics]
     metrics:
       receivers: [otlp, spanmetrics]
       processors: [resourcedetection, memory_limiter, batch]
-      exporters: [otlp_http/prometheus, debug]
-      # exporters: [otlp_http/prometheus, otlp_grpc/data-prepper, debug]
+      exporters: [otlp_http/prometheus]
+      # exporters: [otlp_http/prometheus, otlp_grpc/data-prepper]
     logs:
       receivers: [otlp]
       processors: [resourcedetection, memory_limiter, batch]
-      exporters: [otlp_grpc/data-prepper, debug]
+      exporters: [otlp_grpc/data-prepper]
