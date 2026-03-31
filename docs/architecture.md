@@ -75,10 +75,6 @@ Prometheus. This gives us spans without needing any external application.
   `server.address → peer.service` for HTTP calls and maps port 21890 → `data-prepper`
   for gRPC calls (where Go resolves the hostname to an IP before creating the span).
 
-- **No `debug` exporter**: Debug prints every record to stdout. Docker
-  captures stdout. Fluent-bit tails Docker logs. This creates a feedback loop
-  that amplifies log volume exponentially. Removing it breaks the loop.
-
 ### 2. Data Prepper (`data-prepper`)
 
 **Role**: Transforms OTel data into formats OpenSearch understands.
@@ -98,7 +94,6 @@ and logs. Data Prepper bridges this gap with specialised processors.
 
 **How `otel_apm_service_map` builds the topology**:
 
-This processor does NOT look at `peer.service` or any span attributes.
 It builds relationships by **matching parent-child spans across different services**.
 When a span in service A is the parent of a span in service B (via `parentSpanId`),
 it creates an edge A → B. This means:

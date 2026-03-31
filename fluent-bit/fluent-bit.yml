@@ -4,14 +4,11 @@ service:
 
 pipeline:
   inputs:
-    - name: tail
-      tag: docker.*
-      path: /var/lib/docker/containers/*/*.log
-      parser: docker
-      refresh_interval: 10
-      mem_buf_limit: 50MB
-      skip_long_lines: on
-      db: /tmp/tail.db
+    # Receives logs from Docker's fluentd logging driver over the network.
+    # Works on Linux, macOS, and Windows — no host path mounts needed.
+    - name: forward
+      listen: 0.0.0.0
+      port: 24224
 
   outputs:
     - name: opentelemetry
