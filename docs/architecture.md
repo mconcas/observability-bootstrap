@@ -153,9 +153,10 @@ cannot register Prometheus as a data-connection and you'll get an error.
 
 **Role**: Collects Docker container logs and forwards as OTLP.
 
-Tails all `*.log` files under Docker's container directory and sends them to
-the OTel Collector via OTLP/HTTP on port 4318. This is how logs from
-OpenSearch, Data Prepper, etc. end up in the `logs-otel-v1*` index.
+Receives logs from Docker's **fluentd logging driver** on port 24224 (each
+container is configured with `driver: fluentd` and `fluentd-address: localhost:24224`)
+and sends them to the OTel Collector via OTLP/HTTP on port 4318. This is how
+logs from OpenSearch, Data Prepper, etc. end up in the `logs-otel-v1*` index.
 
 **Caveat**: If the OTel Collector has a `debug` exporter (which prints to stdout),
 Fluent-bit will pick up that output → send it → collector prints debug for that
