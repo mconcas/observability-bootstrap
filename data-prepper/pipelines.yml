@@ -79,6 +79,7 @@ service-map-pipeline:
         routes: [otel_apm_service_map_route]
     - prometheus:
         url: "http://prometheus:9090/api/v1/write"
+        insecure: true
         threshold:
           max_events: 500
           flush_interval: 5s

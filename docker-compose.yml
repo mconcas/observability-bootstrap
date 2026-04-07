@@ -31,6 +31,13 @@ services:
       # Master key for Direct Query datasources plugin (Prometheus, S3, etc.)
       # Without this, OSD cannot register Prometheus as a data-connection.
       - plugins.query.datasources.encryption.masterkey=BTqK4Ytdz67La1kShIKV3Pu9
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
       - "9200:9200"
     volumes:
@@ -119,7 +126,7 @@ services:
       disable: true
 
   data-prepper:
-    image: sgguruda62324/opensearch-data-prepper:${DATA_PREPPER_VERSION}
+    image: opensearchproject/data-prepper:${DATA_PREPPER_VERSION}
     container_name: data-prepper
     logging:
       driver: fluentd
