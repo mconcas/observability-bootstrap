@@ -29,6 +29,15 @@ processors:
           # gRPC exporters: Go gRPC resolves hostname → IP before the span is created,
           # so server.address is an IP. Fix by mapping the known port to the service name.
           - set(attributes["peer.service"], "data-prepper") where kind == SPAN_KIND_CLIENT and attributes["server.port"] == 21890
+  # Fix OpenSearch mapping conflict: otelcol.signal (keyword) vs
+  # otelcol.signal.output (sub-field) in instrumentationScope.attributes.
+  # Flatten dot-separated scope attribute names to underscores.
+  transform/flatten_scope:
+    log_statements:
+      - context: scope
+        statements:
+          - set(attributes["otelcol.signal_output"], attributes["otelcol.signal.output"]) where attributes["otelcol.signal.output"] != nil
+          - delete_key(attributes, "otelcol.signal.output") where attributes["otelcol.signal.output"] != nil
 
 exporters:
   otlp_http/prometheus:
@@ -55,6 +64,15 @@ service:
               prometheus:
                 host: 0.0.0.0
                 port: 8888
+    logs:
+      level: info
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: grpc
+                endpoint: http://localhost:4317
+                insecure: true
     traces:
       # 'detailed' adds net.peer.name, rpc.method, rpc.service etc. to CLIENT spans.
       # The otel_apm_service_map processor in Data Prepper needs these attributes
@@ -81,5 +99,5 @@ service:
       # exporters: [otlp_http/prometheus, otlp_grpc/data-prepper]
     logs:
       receivers: [otlp]
-      processors: [resourcedetection, memory_limiter, batch]
+      processors: [resourcedetection, transform/flatten_scope, memory_limiter, batch]
       exporters: [otlp_grpc/data-prepper]
