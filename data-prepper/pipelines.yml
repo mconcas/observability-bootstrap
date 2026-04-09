@@ -50,6 +50,29 @@ traces-raw-pipeline:
 # Each span becomes one document with fields like traceId, spanId, serviceName, durationInNanos, etc.
   processor:
     - otel_traces:
+    - copy_values:
+        entries:
+          - from_key: "startTime"
+            to_key: "time"
+          - from_key: "startTime"
+            to_key: "@timestamp"
+    # traceGroup is the root span name — required by OpenSearch APM services view.
+    # Data Prepper 2.x no longer sets it automatically; set it from span name for
+    # root spans (parentSpanId empty) and leave child spans for ISM backfill.
+    - add_entries:
+        entries:
+          - key: "traceGroup"
+            value_expression: '/name'
+            add_when: '/parentSpanId == ""'
+          - key: "traceGroupFields/endTime"
+            value_expression: '/endTime'
+            add_when: '/parentSpanId == ""'
+          - key: "traceGroupFields/durationInNanos"
+            value_expression: '/durationInNanos'
+            add_when: '/parentSpanId == ""'
+          - key: "traceGroupFields/statusCode"
+            value_expression: '/status/code'
+            add_when: '/parentSpanId == ""'
   sink:
     - opensearch:
         hosts: ["https://opensearch:9200"]

@@ -26,7 +26,7 @@ services:
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - "OPENSEARCH_JAVA_OPTS=-Xms8g -Xmx8g"
       - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD}"
       # Master key for Direct Query datasources plugin (Prometheus, S3, etc.)
       # Without this, OSD cannot register Prometheus as a data-connection.
@@ -143,6 +143,60 @@ services:
       fluent-bit:
         condition: service_started
 
+  # ── InfoLogger ───────────────────────────────────────────────────────────────
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: INFOLOGGER
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./infologger/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      fluent-bit:
+        condition: service_started
+
+  infologger-server:
+    image: infologger-server:v2.10.1
+    platform: linux/amd64
+    container_name: infologger-server
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.infologger-server
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      fluent-bit:
+        condition: service_started
+    ports:
+      - "6006:6006"
+      - "6102:6102"
+    environment:
+      DB_HOST: mariadb
+      DB_NAME: INFOLOGGER
+      DB_SERVER_USER: infoLoggerServer
+      DB_SERVER_PASS: ilgserver
+      DB_ADMIN_USER: infoLoggerAdmin
+      DB_ADMIN_PASS: ilgadmin
+      DB_BROWSER_USER: infoBrowser
+      DB_BROWSER_PASS: ilgbrowser
+    restart: unless-stopped
+
   # One-shot init container: registers Prometheus data source + index patterns in OSD
   # Uses python:3-alpine because we need both curl and python3 for JSON parsing.
   opensearch-dashboards-init:
@@ -165,3 +219,4 @@ networks:
 volumes:
   opensearch-data:
   prometheus-data:
+  mariadb-data:
