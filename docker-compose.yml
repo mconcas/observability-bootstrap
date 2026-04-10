@@ -158,7 +158,7 @@ services:
       MARIADB_DATABASE: INFOLOGGER
     volumes:
       - mariadb-data:/var/lib/mysql
-      - ./infologger/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./infologger/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
@@ -185,6 +185,7 @@ services:
         condition: service_started
     ports:
       - "6006:6006"
+      - "6007:6007"
       - "6102:6102"
     environment:
       DB_HOST: mariadb
