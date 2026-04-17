@@ -252,11 +252,6 @@ for o in d.get('saved_objects',[]):
         print(o['id']); break
 " 2>/dev/null || true)
 
-  if [ -n "$FOUND" ]; then
-    echo "    $CORR_TITLE -> already exists ($FOUND)"
-    return
-  fi
-
   PAYLOAD="{
     \"attributes\": {
       \"correlationType\": \"$CORR_TYPE\",
@@ -269,6 +264,23 @@ for o in d.get('saved_objects',[]):
     PAYLOAD="$PAYLOAD, \"workspaces\": [\"$WS_ID\"]"
   fi
   PAYLOAD="$PAYLOAD}"
+
+  if [ -n "$FOUND" ]; then
+    # Update existing correlation to ensure references point to current IDs
+    if [ -n "$WS_ID" ]; then
+      UPD_URL="$OSD_URL/w/$WS_ID/api/saved_objects/correlations/$FOUND"
+    else
+      UPD_URL="$OSD_URL/api/saved_objects/correlations/$FOUND"
+    fi
+    RESP=$(req -X PUT "$UPD_URL" -d "$PAYLOAD")
+    CODE=$(http_code "$RESP")
+    if [ "$CODE" = "200" ]; then
+      echo "    $CORR_TITLE -> updated ($FOUND)"
+    else
+      echo "    $CORR_TITLE -> update HTTP $CODE: $(http_body "$RESP")"
+    fi
+    return
+  fi
 
   RESP=$(req -X POST "$URL" -d "$PAYLOAD")
   CODE=$(http_code "$RESP")

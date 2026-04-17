@@ -38,6 +38,21 @@ processors:
         statements:
           - set(attributes["otelcol.signal_output"], attributes["otelcol.signal.output"]) where attributes["otelcol.signal.output"] != nil
           - delete_key(attributes, "otelcol.signal.output") where attributes["otelcol.signal.output"] != nil
+  # Extract service identity from InfoLogger's "facility" body field so that
+  # OSD Trace Analytics can correlate logs ↔ services.
+  # DPL sets InfoLoggerContext::Facility = DeviceSpec::name, which is the same
+  # value used as the OTLP service.name in the tracing SDK.
+  # Step 1: copy body["facility"] into a log-record attribute.
+  # Step 2: groupbyattrs (below) promotes it to resource.attributes and regroups
+  #         log records so each unique facility gets its own resource scope.
+  transform/logs_service:
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["service.name"], attributes["facility"]) where attributes["facility"] != nil and attributes["service.name"] == nil
+  groupbyattrs/logs:
+    keys:
+      - service.name
 
 exporters:
   otlp_http/prometheus:
@@ -81,5 +96,5 @@ service:
       # exporters: [otlp_http/prometheus, otlp_grpc/data-prepper]
     logs:
       receivers: [otlp]
-      processors: [resourcedetection, transform/flatten_scope, memory_limiter, batch]
+      processors: [resourcedetection, transform/flatten_scope, transform/logs_service, groupbyattrs/logs, memory_limiter, batch]
       exporters: [otlp_grpc/data-prepper]

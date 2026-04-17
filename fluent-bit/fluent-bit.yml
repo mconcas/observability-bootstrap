@@ -21,6 +21,14 @@ pipeline:
       tag: app.logs.infologger
 
   filters:
+    # The syslog parser extracts a "pid" from the RFC 5424 header (bridge process).
+    # The InfoLogger JSON body also contains "pid" (application process).
+    # Rename the syslog-level pid before JSON parsing to avoid duplicate keys,
+    # which would cause data-prepper to reject the OTLP log record.
+    - name: modify
+      match: app.logs.infologger
+      rename: pid syslog_pid
+
     # Parse the InfoLogger JSON body to extract structured fields (including traceid/spanid)
     - name: parser
       match: app.logs.infologger
@@ -38,3 +46,11 @@ pipeline:
       # Map InfoLogger traceid/spanid record keys to OTLP log-level trace correlation fields
       logs_trace_id_message_key: traceid
       logs_span_id_message_key: spanid
+      # Use "message" (InfoLogger syslog) or "log" (Docker forward) as the OTLP
+      # log body; promote all remaining keys (facility, severity, pid, …) to
+      # OTLP log-record attributes so the otel-collector transform/logs_service
+      # processor can derive service.name from the facility attribute.
+      logs_body_key:
+        - $message
+        - $log
+      logs_body_key_attributes: true
