@@ -50,6 +50,17 @@ processors:
       - context: log
         statements:
           - set(attributes["service.name"], attributes["facility"]) where attributes["facility"] != nil and attributes["service.name"] == nil
+          # Map InfoLogger single-letter severity to OTLP severity_text / severity_number
+          - set(severity_text, "DEBUG")  where attributes["severity"] == "D"
+          - set(severity_number, SEVERITY_NUMBER_DEBUG)  where attributes["severity"] == "D"
+          - set(severity_text, "INFO")   where attributes["severity"] == "I"
+          - set(severity_number, SEVERITY_NUMBER_INFO)   where attributes["severity"] == "I"
+          - set(severity_text, "WARN")   where attributes["severity"] == "W"
+          - set(severity_number, SEVERITY_NUMBER_WARN)   where attributes["severity"] == "W"
+          - set(severity_text, "ERROR")  where attributes["severity"] == "E"
+          - set(severity_number, SEVERITY_NUMBER_ERROR)  where attributes["severity"] == "E"
+          - set(severity_text, "FATAL")  where attributes["severity"] == "F"
+          - set(severity_number, SEVERITY_NUMBER_FATAL)  where attributes["severity"] == "F"
   groupbyattrs/logs:
     keys:
       - service.name
