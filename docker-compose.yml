@@ -10,6 +10,8 @@ services:
       - "24224:24224"
     volumes:
      - ./fluent-bit/fluent-bit.yml:/etc/fluent-bit/fluent-bit.yml
+     - ./fluent-bit/parsers.yml:/etc/fluent-bit/parsers.yml
+     - fluentbit-socket:/tmp/fluent-bit-socket
 
   opensearch:
     image: ${OPENSEARCH_DOCKER_REPO}/opensearch:${OPENSEARCH_VERSION}
@@ -165,3 +167,4 @@ networks:
 volumes:
   opensearch-data:
   prometheus-data:
+  fluentbit-socket:

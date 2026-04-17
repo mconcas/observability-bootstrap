@@ -1,6 +1,7 @@
 service:
   flush: 5
   log_level: info
+  parsers_file: parsers.yml
 
 pipeline:
   inputs:
@@ -10,9 +11,30 @@ pipeline:
       listen: 0.0.0.0
       port: 24224
 
+    - name: syslog
+      parser: infologger_syslog_parser
+      mode: unix_tcp
+      path: /tmp/fluent-bit-socket/syslog.sock
+      unix_perm: 0777
+      buffer_chunk_size: 32k
+      buffer_max_size: 64k
+      tag: app.logs.infologger
+
+  filters:
+    # Parse the InfoLogger JSON body to extract structured fields (including traceid/spanid)
+    - name: parser
+      match: app.logs.infologger
+      key_name: message
+      parser: infologger_json
+      reserve_data: true
+      preserve_key: false
+
   outputs:
     - name: opentelemetry
       match: "*"
       host: otel-collector
       port: 4318
       logs_uri: /v1/logs
+      # Map InfoLogger traceid/spanid record keys to OTLP log-level trace correlation fields
+      logs_trace_id_message_key: traceid
+      logs_span_id_message_key: spanid
