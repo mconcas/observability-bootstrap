@@ -150,11 +150,12 @@ services:
   opensearch-dashboards-init:
     image: python:3-alpine
     container_name: opensearch-dashboards-init
-    entrypoint: ["sh", "-c", "apk add --no-cache curl >/dev/null 2>&1 && sh /init-datasource.sh"]
+    entrypoint: ["python3", "/init-datasource.py"]
     environment:
       - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}
     volumes:
       - ./opensearch-dashboards/init-datasource.sh:/init-datasource.sh:ro
+      - ./opensearch-dashboards/init-datasource.py:/init-datasource.py:ro
     depends_on:
       opensearch-dashboards:
         condition: service_started
