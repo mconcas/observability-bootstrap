@@ -1,0 +1,31 @@
+# ======================== OpenSearch Configuration =========================
+#
+# Mounted into the container at /usr/share/opensearch/config/opensearch.yml
+# See: https://opensearch.org/docs/latest/install-and-configure/configuring-opensearch/
+
+# -------------------------------- Cluster -----------------------------------
+cluster.name: observability-bootstrap
+
+# -------------------------------- Node --------------------------------------
+node.name: opensearch-node1
+
+# -------------------------------- Discovery ---------------------------------
+discovery.type: single-node
+
+# -------------------------------- Memory ------------------------------------
+bootstrap.memory_lock: true
+
+# -------------------------------- Network -----------------------------------
+network.host: 0.0.0.0
+
+# -------------------------------- Plugins -----------------------------------
+
+# Direct Query datasources plugin (Prometheus, S3, etc.)
+# Without this, OSD cannot register Prometheus as a data-connection.
+plugins.query.datasources.encryption.masterkey: BTqK4Ytdz67La1kShIKV3Pu9
+
+# -------------------------------- Security ----------------------------------
+# Security plugin disabled for local development convenience.
+# OpenSearch listens on plain HTTP without authentication.
+# Re-enable for any network-exposed or production deployment.
+plugins.security.disabled: true

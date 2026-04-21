@@ -7,24 +7,24 @@ source "$(dirname "$0")/_common.sh"
 echo "=== Validating Data Flow ==="
 
 # 1. Logs indexed in OpenSearch
-LOG_COUNT=$(curl -sk -u "admin:${OPENSEARCH_PASSWORD}" \
-  "https://localhost:9200/logs-otel-v1*/_count" 2>/dev/null | \
+LOG_COUNT=$(curl -s \
+  "http://localhost:9200/logs-otel-v1*/_count" 2>/dev/null | \
   python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "0")
 [ "$LOG_COUNT" -gt 0 ] \
   && pass "Logs indexed: $LOG_COUNT documents" \
   || fail "No log documents in logs-otel-v1*"
 
 # 2. Traces indexed in OpenSearch
-TRACE_COUNT=$(curl -sk -u "admin:${OPENSEARCH_PASSWORD}" \
-  "https://localhost:9200/otel-v1-apm-span*/_count" 2>/dev/null | \
+TRACE_COUNT=$(curl -s \
+  "http://localhost:9200/otel-v1-apm-span*/_count" 2>/dev/null | \
   python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "0")
 [ "$TRACE_COUNT" -gt 0 ] \
   && pass "Traces indexed: $TRACE_COUNT span documents" \
   || fail "No span documents in otel-v1-apm-span*"
 
 # 3. Service-map documents in OpenSearch
-SVCMAP_COUNT=$(curl -sk -u "admin:${OPENSEARCH_PASSWORD}" \
-  "https://localhost:9200/otel-v2-apm-service-map*/_count" 2>/dev/null | \
+SVCMAP_COUNT=$(curl -s \
+  "http://localhost:9200/otel-v2-apm-service-map*/_count" 2>/dev/null | \
   python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "0")
 [ "$SVCMAP_COUNT" -gt 0 ] \
   && pass "Service-map docs: $SVCMAP_COUNT" \

@@ -26,10 +26,7 @@ otel-logs-pipeline:
             to_key: "@timestamp"
   sink:
     - opensearch:
-        hosts: ["https://opensearch:9200"]
-        username: "admin"
-        password: "MyStr0ng!Pass#2024"
-        insecure: true
+        hosts: ["http://opensearch:9200"]
         index_type: log-analytics-plain
 
 otel-traces-pipeline:
@@ -75,10 +72,7 @@ traces-raw-pipeline:
             add_when: '/parentSpanId == ""'
   sink:
     - opensearch:
-        hosts: ["https://opensearch:9200"]
-        username: "admin"
-        password: "MyStr0ng!Pass#2024"
-        insecure: true
+        hosts: ["http://opensearch:9200"]
         index_type: trace-analytics-plain-raw
 
 service-map-pipeline:
@@ -88,16 +82,13 @@ service-map-pipeline:
       name: "otel-traces-pipeline"
   processor:
     - otel_apm_service_map:
-        window_duration: 10s
+        window_duration: 600s
   route:
     - otel_apm_service_map_route: 'getEventType() == "SERVICE_MAP"'
     - service_processed_metrics: 'getEventType() == "METRIC"'
   sink:
     - opensearch:
-        hosts: ["https://opensearch:9200"]
-        username: "admin"
-        password: "MyStr0ng!Pass#2024"
-        insecure: true
+        hosts: ["http://opensearch:9200"]
         index_type: otel-v2-apm-service-map
         routes: [otel_apm_service_map_route]
     - prometheus:

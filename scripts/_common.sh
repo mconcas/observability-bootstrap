@@ -5,10 +5,9 @@ set -euo pipefail
 PASS_COUNT=0
 FAIL_COUNT=0
 
-# Load password from .env
+# Repo root (used for relative paths)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OPENSEARCH_PASSWORD=$(grep '^OPENSEARCH_PASSWORD=' "$REPO_ROOT/.env" | cut -d= -f2-)
 
 pass() { echo "  PASS: $1"; PASS_COUNT=$((PASS_COUNT + 1)); }
 fail() { echo "  FAIL: $1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }

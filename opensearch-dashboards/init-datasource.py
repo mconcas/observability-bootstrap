@@ -19,11 +19,9 @@ KEY CONCEPTS:
 """
 
 import json
-import os
 import time
 import urllib.error
 import urllib.request
-from base64 import b64encode
 from typing import Any, cast
 
 JsonObj = dict[str, Any]
@@ -34,11 +32,7 @@ def _obj(val: Any) -> JsonObj:
     return cast(JsonObj, val) if isinstance(val, dict) else {}
 
 OSD_URL = "http://opensearch-dashboards:5601"
-USER = "admin"
-PASS = os.environ.get("OPENSEARCH_PASSWORD", "MyStr0ng!Pass#2024")
 PROM_NAME = "prometheus"
-
-_AUTH_HEADER = "Basic " + b64encode(f"{USER}:{PASS}".encode()).decode()
 
 
 # HTTP helpers
@@ -51,7 +45,6 @@ def req(method: str, url: str, data: dict[str, Any] | list[Any] | None = None) -
         data=body,
         method=method,
         headers={
-            "Authorization": _AUTH_HEADER,
             "osd-xsrf": "true",
             "Content-Type": "application/json",
         },

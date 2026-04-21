@@ -11,14 +11,14 @@ echo "=== Validating $SERVICE ==="
 check_container_running "$SERVICE"
 
 # 2. OSD API responding
-HTTP_CODE=$(curl -so /dev/null -w '%{http_code}' -u "admin:${OPENSEARCH_PASSWORD}" \
+HTTP_CODE=$(curl -so /dev/null -w '%{http_code}' \
   "http://localhost:5601/api/status" 2>/dev/null || echo "000")
 [ "$HTTP_CODE" = "200" ] \
   && pass "API responding (HTTP $HTTP_CODE)" \
   || fail "API returned HTTP $HTTP_CODE"
 
 # 3. Observability workspace exists
-WS=$(curl -s -u "admin:${OPENSEARCH_PASSWORD}" -H "osd-xsrf: true" -H "Content-Type: application/json" \
+WS=$(curl -s -H "osd-xsrf: true" -H "Content-Type: application/json" \
   -X POST "http://localhost:5601/api/workspaces/_list" -d '{}' 2>/dev/null | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
@@ -34,7 +34,7 @@ else:
   || fail "Observability workspace not found"
 
 # 4. Prometheus data-connection registered
-DC=$(curl -s -u "admin:${OPENSEARCH_PASSWORD}" -H "osd-xsrf: true" \
+DC=$(curl -s -H "osd-xsrf: true" \
   "http://localhost:5601/api/saved_objects/_find?type=data-connection&per_page=100" 2>/dev/null | \
   grep -c "prometheus" || echo "0")
 [ "$DC" -ge 1 ] \
@@ -43,7 +43,7 @@ DC=$(curl -s -u "admin:${OPENSEARCH_PASSWORD}" -H "osd-xsrf: true" \
 
 # 5. Index patterns exist
 for pattern in "otel-v1-apm-span*" "logs-otel-v1*" "otel-v2-apm-service-map*"; do
-  FOUND=$(curl -s -u "admin:${OPENSEARCH_PASSWORD}" -H "osd-xsrf: true" \
+  FOUND=$(curl -s -H "osd-xsrf: true" \
     "http://localhost:5601/api/saved_objects/_find?type=index-pattern&search_fields=title&search=${pattern}&per_page=10" 2>/dev/null | \
     python3 -c "
 import sys, json

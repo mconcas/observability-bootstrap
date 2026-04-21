@@ -26,13 +26,7 @@ services:
       fluent-bit:
         condition: service_started
     environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms8g -Xmx8g"
-      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD}"
-      # Master key for Direct Query datasources plugin (Prometheus, S3, etc.)
-      # Without this, OSD cannot register Prometheus as a data-connection.
-      - plugins.query.datasources.encryption.masterkey=BTqK4Ytdz67La1kShIKV3Pu9
     ulimits:
       memlock:
         soft: -1
@@ -44,8 +38,9 @@ services:
       - "127.0.0.1:9200:9200"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
+      - ./opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
     healthcheck:
-      test: curl -s -k -u admin:${OPENSEARCH_PASSWORD} https://localhost:9200/_cluster/health | grep -qE '"status":"(green|yellow)"'
+      test: curl -s http://localhost:9200/_cluster/health | grep -qE '"status":"(green|yellow)"'
       start_period: 30s
       interval: 5s
       timeout: 10s
@@ -63,9 +58,8 @@ services:
     ports:
       - "5601:5601"
     environment:
-      - OPENSEARCH_HOSTS=https://opensearch:9200
-      - OPENSEARCH_USERNAME=admin
-      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}
+      - OPENSEARCH_HOSTS=http://opensearch:9200
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
     volumes:
         - ./opensearch-dashboards/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
     depends_on:
@@ -145,14 +139,38 @@ services:
       fluent-bit:
         condition: service_started
 
+  # Periodic enricher: resolves OTLP span links → service-map edges for fan-in
+  # topology (e.g. B→D in a diamond A→B,A→C,B→D,C→D) that Data-Prepper's
+  # otel_apm_service_map processor cannot derive from parent-child spans alone.
+  service-map-enricher:
+    image: python:3-alpine
+    container_name: service-map-enricher
+    entrypoint: ["python3", "/enrich.py"]
+    environment:
+      - OPENSEARCH_URL=http://opensearch:9200
+      - ENRICH_INTERVAL_SECONDS=30
+      - LOOKBACK_MINUTES=30
+      - PROCESSING_BUFFER_MIN=10
+      - MIN_AGE_MINUTES=10
+    volumes:
+      - ./service-map-enricher/enrich.py:/enrich.py:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.service-map-enricher
+
   # One-shot init container: registers Prometheus data source + index patterns in OSD
   # Uses python:3-alpine because we need both curl and python3 for JSON parsing.
   opensearch-dashboards-init:
     image: python:3-alpine
     container_name: opensearch-dashboards-init
     entrypoint: ["python3", "/init-datasource.py"]
-    environment:
-      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}
     volumes:
       - ./opensearch-dashboards/init-datasource.sh:/init-datasource.sh:ro
       - ./opensearch-dashboards/init-datasource.py:/init-datasource.py:ro
