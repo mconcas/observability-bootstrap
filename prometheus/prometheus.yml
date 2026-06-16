@@ -13,21 +13,12 @@ storage:
     # Needed when Data Prepper pushes RED metrics at irregular intervals.
     out_of_order_time_window: 30m
 
-scrape_configs:
-  # 1) Self-scraping — Prometheus monitors its own health
-  - job_name: "prometheus"
-    static_configs:
-      - targets: ["localhost:9090"]
-
-  # 2) OTel Collector internal metrics (throughput, dropped spans, etc.)
-  - job_name: "otel-collector"
-    scrape_interval: 10s
-    static_configs:
-      - targets: ["otel-collector:8888"]
-
-  # 3) Data Prepper pipeline metrics (bulk errors, buffer usage, latency)
-  - job_name: "data-prepper"
-    metrics_path: "/metrics/prometheus"
-    scrape_interval: 30s
-    static_configs:
-      - targets: ["data-prepper:4900"]
+# Vanilla default: no self-scrapes. Prometheus only stores metrics it receives
+# via the OTLP receiver (--web.enable-otlp-receiver) and remote-write
+# (--web.enable-remote-write-receiver) — i.e. external/app telemetry forwarded by
+# the otel-collector and Data Prepper, not the stack's own internal metrics.
+#
+# To scrape the stack's own components (prometheus, otel-collector, data-prepper),
+# use docker-compose.self-monitoring.yml, which mounts prometheus.self-monitoring.yml
+# in place of this file.
+scrape_configs: []

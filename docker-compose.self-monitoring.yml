@@ -1,0 +1,79 @@
+# Self-monitoring overlay — re-enables the stack's self-instrumentation on top of
+# the vanilla default. With this overlay every component ships its container logs
+# to fluent-bit via the Docker fluentd driver, and Prometheus scrapes the stack's
+# own metrics (prometheus, otel-collector, data-prepper).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.self-monitoring.yml up -d
+#
+# Plain `docker compose up -d` (vanilla) injects none of the stack's own telemetry
+# and only ingests external data (OTLP on 4317/4318, InfoLogger on the syslog socket).
+#
+# This overlay also generates the self-traffic that the scripts/validate-*.sh
+# checks assert on (fluentd log driver on every container, otel-collector /
+# data-prepper scrape targets up), so run validation with this overlay active.
+
+services:
+  opensearch:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.opensearch
+    depends_on:
+      fluent-bit:
+        condition: service_started
+
+  opensearch-dashboards:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.opensearch-dashboards
+    depends_on:
+      fluent-bit:
+        condition: service_started
+
+  prometheus:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.prometheus
+    depends_on:
+      fluent-bit:
+        condition: service_started
+    # Replace the vanilla (no-scrape) config with the self-scraping one.
+    # Compose merges volumes by container path, so this overrides only the config mount.
+    volumes:
+      - ./prometheus/prometheus.self-monitoring.yml:/etc/prometheus/prometheus.yml:ro
+
+  otel-collector:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.otel-collector
+
+  data-prepper:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.data-prepper
+    depends_on:
+      fluent-bit:
+        condition: service_started
+
+  service-map-enricher:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        fluentd-async: "true"
+        tag: docker.service-map-enricher

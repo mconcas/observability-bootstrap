@@ -1,3 +1,11 @@
+# Vanilla default: the stack runs ready to ingest EXTERNAL telemetry (OTLP on
+# 4317/4318, InfoLogger on the fluent-bit syslog socket) but injects none of its
+# own. No component ships its container logs to fluent-bit, and Prometheus does
+# not scrape the stack's own components.
+#
+# To re-enable the stack's self-instrumentation (container logs + self-scrapes),
+# layer the overlay on top:
+#   docker compose -f docker-compose.yml -f docker-compose.self-monitoring.yml up -d
 services:
   fluent-bit:
     image: fluent/fluent-bit:${FLUENTBIT_VERSION}
@@ -16,15 +24,6 @@ services:
   opensearch:
     image: ${OPENSEARCH_DOCKER_REPO}/opensearch:${OPENSEARCH_VERSION}
     container_name: opensearch
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        fluentd-async: "true"
-        tag: docker.opensearch
-    depends_on:
-      fluent-bit:
-        condition: service_started
     environment:
       - "OPENSEARCH_JAVA_OPTS=-Xms8g -Xmx8g"
     ulimits:
@@ -49,12 +48,6 @@ services:
   opensearch-dashboards:
     image: ${OPENSEARCH_DOCKER_REPO}/opensearch-dashboards:${OPENSEARCH_DASHBOARDS_VERSION}
     container_name: opensearch-dashboards
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        fluentd-async: "true"
-        tag: docker.opensearch-dashboards
     ports:
       - "5601:5601"
     environment:
@@ -65,17 +58,9 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
-      fluent-bit:
-        condition: service_started
   prometheus:
     image: prom/prometheus:${PROMETHEUS_VERSION}
     container_name: prometheus
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        fluentd-async: "true"
-        tag: docker.prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --web.enable-otlp-receiver
@@ -86,9 +71,6 @@ services:
     volumes:
       - prometheus-data:/prometheus # docker volume
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro # local volume
-    depends_on:
-      fluent-bit:
-        condition: service_started
     healthcheck:
       test: wget -q --spider http://localhost:9090/-/healthy
       start_period: 30s
@@ -99,12 +81,6 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_CONTRIB_VERSION}
     container_name: otel-collector
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        fluentd-async: "true"
-        tag: docker.otel-collector
     command:
      - --config=/etc/otelcol-contrib/config.yml
     ports:
@@ -124,12 +100,6 @@ services:
   data-prepper:
     image: opensearchproject/data-prepper:${DATA_PREPPER_VERSION}
     container_name: data-prepper
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        fluentd-async: "true"
-        tag: docker.data-prepper
     volumes:
       - ./data-prepper/pipelines.yml:/usr/share/data-prepper/pipelines/pipelines.yml:ro
       - ./data-prepper/data-prepper-config.yml:/usr/share/data-prepper/config/data-prepper-config.yaml:ro
@@ -138,32 +108,6 @@ services:
         condition: service_healthy
       fluent-bit:
         condition: service_started
-
-  # Periodic enricher: resolves OTLP span links → service-map edges for fan-in
-  # topology (e.g. B→D in a diamond A→B,A→C,B→D,C→D) that Data-Prepper's
-  # otel_apm_service_map processor cannot derive from parent-child spans alone.
-  service-map-enricher:
-    image: python:3-alpine
-    container_name: service-map-enricher
-    entrypoint: ["python3", "/enrich.py"]
-    environment:
-      - OPENSEARCH_URL=http://opensearch:9200
-      - ENRICH_INTERVAL_SECONDS=30
-      - LOOKBACK_MINUTES=30
-      - PROCESSING_BUFFER_MIN=10
-      - MIN_AGE_MINUTES=10
-    volumes:
-      - ./service-map-enricher/enrich.py:/enrich.py:ro
-    depends_on:
-      opensearch:
-        condition: service_healthy
-    restart: unless-stopped
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        fluentd-async: "true"
-        tag: docker.service-map-enricher
 
   # One-shot init container: registers Prometheus data source + index patterns in OSD
   # Uses python:3-alpine because we need both curl and python3 for JSON parsing.
