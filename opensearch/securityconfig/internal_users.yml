@@ -1,0 +1,20 @@
+---
+# Internal user database for HTTP Basic auth.
+# Passwords are stored ONLY as bcrypt hashes (never plaintext). Generate a hash
+# with:
+#   docker run --rm --entrypoint bash opensearchproject/opensearch:<ver> \
+#     -c "OPENSEARCH_JAVA_HOME=/usr/share/opensearch/jdk \
+#         plugins/opensearch-security/tools/hash.sh -p '<password>'"
+#
+# The plaintext that the in-stack clients use lives in .env (OPENSEARCH_PASSWORD);
+# it MUST correspond to the hash below.
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+admin:
+  hash: "$2y$12$iY6ZN1iwcAL.hFVfPsHHzOJ9ae14D3ObxK37bjFGl5TkKcci1XJAi"
+  reserved: true
+  backend_roles:
+    - "admin"
+  description: "Stack administrator — full access (mapped to all_access)."

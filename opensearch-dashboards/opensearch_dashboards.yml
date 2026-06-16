@@ -1,5 +1,12 @@
 server.host: "0.0.0.0"
 
+# --- Security dashboards plugin (HTTP Basic login) ---
+# Multitenancy off: saved objects live in the global tenant so the workspace-based
+# bootstrap (init-datasource.py) is not split across per-tenant indices.
+opensearch_security.multitenancy.enabled: false
+# OSD <-> browser is plain http here, so the session cookie must not require TLS.
+opensearch_security.cookie.secure: false
+
 explore.enabled: true
 explore.discoverTraces.enabled: true
 explore.discoverMetrics.enabled: true

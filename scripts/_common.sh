@@ -9,6 +9,15 @@ FAIL_COUNT=0
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Credentials for the security plugin (HTTP Basic), sourced from .env so the
+# checks can authenticate against OpenSearch (9200) and OSD (5601). Use as:
+#   curl -s "${OS_AUTH[@]}" "http://localhost:9200/..."
+if [ -f "$REPO_ROOT/.env" ]; then
+  # shellcheck disable=SC1090,SC1091
+  set -a; . "$REPO_ROOT/.env"; set +a
+fi
+OS_AUTH=(-u "${OPENSEARCH_USERNAME:-admin}:${OPENSEARCH_PASSWORD:-}")
+
 pass() { echo "  PASS: $1"; PASS_COUNT=$((PASS_COUNT + 1)); }
 fail() { echo "  FAIL: $1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 

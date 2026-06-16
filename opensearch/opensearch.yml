@@ -25,7 +25,42 @@ network.host: 0.0.0.0
 plugins.query.datasources.encryption.masterkey: BTqK4Ytdz67La1kShIKV3Pu9
 
 # -------------------------------- Security ----------------------------------
-# Security plugin disabled for local development convenience.
-# OpenSearch listens on plain HTTP without authentication.
-# Re-enable for any network-exposed or production deployment.
-plugins.security.disabled: true
+# HTTP Basic authentication against the internal user database. This is a fully
+# self-owned configuration: no demo installer runs (DISABLE_INSTALL_DEMO_CONFIG
+# is set on the container). We supply our own CA-signed transport certs and our
+# own security config (internal_users / roles_mapping / config under
+# opensearch/securityconfig/).
+plugins.security.disabled: false
+
+# Transport-layer TLS is mandatory for the security plugin. Certs are generated
+# by scripts/gen-certs.sh into opensearch/certs/ (mounted at config/certs/).
+# Paths are resolved relative to the config directory.
+plugins.security.ssl.transport.pemcert_filepath: certs/esnode.pem
+plugins.security.ssl.transport.pemkey_filepath: certs/esnode-key.pem
+plugins.security.ssl.transport.pemtrustedcas_filepath: certs/root-ca.pem
+plugins.security.ssl.transport.enforce_hostname_verification: false
+plugins.security.ssl.transport.resolve_hostname: false
+
+# HTTP/REST layer stays plain http:// — auth is still enforced, there is just no
+# TLS on the REST port, so browsers and in-stack clients keep using
+# http://opensearch:9200 with a username/password.
+plugins.security.ssl.http.enabled: false
+
+# Certificate DNs. The admin cert grants full cluster access over the transport
+# layer; it MUST differ from the node DN.
+plugins.security.authcz.admin_dn:
+  - 'CN=admin'
+plugins.security.nodes_dn:
+  - 'CN=opensearch-node1'
+
+# Initialise the .opensearch_security index from the mounted security config on
+# first boot of a fresh cluster (no securityadmin.sh round-trip needed).
+# NOTE: once the security index exists in the data volume, later edits to the
+# security config require re-running securityadmin.sh (or wiping the volume).
+plugins.security.allow_default_init_securityindex: true
+
+# We bring our own CA-signed certs — reject the bundled demo certificates.
+plugins.security.allow_unsafe_democertificates: false
+
+plugins.security.audit.type: internal_opensearch
+plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]

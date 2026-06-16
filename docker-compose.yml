@@ -26,6 +26,11 @@ services:
     container_name: opensearch
     environment:
       - "OPENSEARCH_JAVA_OPTS=-Xms8g -Xmx8g"
+      # Security plugin stays enabled, but we own every bit of its config: skip
+      # the bundled demo installer entirely (no auto-generated certs, no
+      # auto-written opensearch.yml). Certs come from scripts/gen-certs.sh and
+      # the security config is mounted below.
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
     ulimits:
       memlock:
         soft: -1
@@ -38,8 +43,12 @@ services:
     volumes:
       - opensearch-data:/usr/share/opensearch/data
       - ./opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+      - ./opensearch/certs:/usr/share/opensearch/config/certs:ro
+      - ./opensearch/securityconfig/internal_users.yml:/usr/share/opensearch/config/opensearch-security/internal_users.yml:ro
+      - ./opensearch/securityconfig/roles_mapping.yml:/usr/share/opensearch/config/opensearch-security/roles_mapping.yml:ro
+      - ./opensearch/securityconfig/config.yml:/usr/share/opensearch/config/opensearch-security/config.yml:ro
     healthcheck:
-      test: curl -s http://localhost:9200/_cluster/health | grep -qE '"status":"(green|yellow)"'
+      test: curl -s -u "admin:${OPENSEARCH_PASSWORD}" http://localhost:9200/_cluster/health | grep -qE '"status":"(green|yellow)"'
       start_period: 30s
       interval: 5s
       timeout: 10s
@@ -52,7 +61,11 @@ services:
       - "5601:5601"
     environment:
       - OPENSEARCH_HOSTS=http://opensearch:9200
-      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+      # Security dashboards plugin stays enabled (provides the login screen).
+      # OSD authenticates to OpenSearch with these credentials; OPENSEARCH_USERNAME
+      # / OPENSEARCH_PASSWORD map to opensearch.username / opensearch.password.
+      - OPENSEARCH_USERNAME=admin
+      - "OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}"
     volumes:
         - ./opensearch-dashboards/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
     depends_on:
@@ -115,6 +128,10 @@ services:
     image: python:3-alpine
     container_name: opensearch-dashboards-init
     entrypoint: ["python3", "/init-datasource.py"]
+    environment:
+      # The OSD API now requires authentication; the init script reads these.
+      - OSD_USERNAME=admin
+      - "OSD_PASSWORD=${OPENSEARCH_PASSWORD}"
     volumes:
       - ./opensearch-dashboards/init-datasource.sh:/init-datasource.sh:ro
       - ./opensearch-dashboards/init-datasource.py:/init-datasource.py:ro

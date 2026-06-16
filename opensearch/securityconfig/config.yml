@@ -1,0 +1,21 @@
+---
+# Authentication / authorization backends.
+# A single domain: HTTP Basic credentials validated against the internal user
+# database (internal_users.yml).
+_meta:
+  type: "config"
+  config_version: 2
+
+config:
+  dynamic:
+    authc:
+      basic_internal_auth_domain:
+        description: "HTTP Basic against the internal user database"
+        http_enabled: true
+        transport_enabled: true
+        order: 0
+        http_authenticator:
+          type: basic
+          challenge: true
+        authentication_backend:
+          type: internal

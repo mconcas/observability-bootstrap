@@ -27,6 +27,10 @@ otel-logs-pipeline:
   sink:
     - opensearch:
         hosts: ["http://opensearch:9200"]
+        # HTTP Basic credentials for the security plugin. Data Prepper does not
+        # interpolate env vars here, so this must match OPENSEARCH_PASSWORD in .env.
+        username: "admin"
+        password: "MyStr0ng!Pass#2024"
         index_type: log-analytics-plain
 
 otel-traces-pipeline:
@@ -73,6 +77,8 @@ traces-raw-pipeline:
   sink:
     - opensearch:
         hosts: ["http://opensearch:9200"]
+        username: "admin"
+        password: "MyStr0ng!Pass#2024"
         index_type: trace-analytics-plain-raw
 
 service-map-pipeline:
@@ -89,6 +95,8 @@ service-map-pipeline:
   sink:
     - opensearch:
         hosts: ["http://opensearch:9200"]
+        username: "admin"
+        password: "MyStr0ng!Pass#2024"
         index_type: otel-v2-apm-service-map
         routes: [otel_apm_service_map_route]
     - prometheus:

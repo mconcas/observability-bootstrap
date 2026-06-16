@@ -18,7 +18,9 @@ KEY CONCEPTS:
    Direct Query credentials (set in docker-compose.yml on the opensearch service).
 """
 
+import base64
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -34,20 +36,32 @@ def _obj(val: Any) -> JsonObj:
 OSD_URL = "http://opensearch-dashboards:5601"
 PROM_NAME = "prometheus"
 
+# OSD now sits behind HTTP Basic auth (security plugin). Build the header once.
+_OSD_USER = os.environ.get("OSD_USERNAME", "")
+_OSD_PASS = os.environ.get("OSD_PASSWORD", "")
+_AUTH_HEADER = (
+    "Basic " + base64.b64encode(f"{_OSD_USER}:{_OSD_PASS}".encode()).decode()
+    if _OSD_USER
+    else ""
+)
+
 
 # HTTP helpers
 
 def req(method: str, url: str, data: dict[str, Any] | list[Any] | None = None) -> tuple[int, Any]:
     """Send an HTTP request and return (status_code, parsed_json_or_text)."""
     body = json.dumps(data).encode() if data is not None else None
+    headers = {
+        "osd-xsrf": "true",
+        "Content-Type": "application/json",
+    }
+    if _AUTH_HEADER:
+        headers["Authorization"] = _AUTH_HEADER
     r = urllib.request.Request(
         url,
         data=body,
         method=method,
-        headers={
-            "osd-xsrf": "true",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(r) as resp:
