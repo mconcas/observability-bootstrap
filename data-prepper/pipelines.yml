@@ -32,6 +32,10 @@ otel-logs-pipeline:
         username: "admin"
         password: "MyStr0ng!Pass#2024"
         index_type: log-analytics-plain
+        # Deterministic _id from the content fingerprint the collector computes
+        # (otel-collector/config.yml, transform/logs_service). A replayed log
+        # record overwrites its prior copy instead of creating a duplicate.
+        document_id: "${/attributes/log_uid}"
 
 otel-traces-pipeline:
   source:
