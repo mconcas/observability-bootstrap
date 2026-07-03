@@ -240,6 +240,35 @@ def create_index_pattern(
     return None
 
 
+# Step 4b: Populate the index-pattern field cache
+
+def refresh_index_pattern_fields(ip_id: str, title: str, ws_id: str | None = None) -> None:
+    """Fetch field capabilities for the pattern and store them on the saved object.
+
+    Index patterns created via the saved_objects API have an empty ``fields``
+    attribute. OSD Discover validates ``timeFieldName`` against that cached list,
+    so without this it fails with "Could not locate that index-pattern-field
+    (id: time)". This mirrors the "refresh field list" button in the UI.
+    Best-effort: if the backing index does not exist yet, the field list stays
+    empty and Discover refreshes it on first open.
+    """
+    meta = "&".join(f"meta_fields={m}" for m in ("_source", "_id", "_index", "_score"))
+    code, body = req(
+        "GET",
+        api(f"/api/index_patterns/_fields_for_wildcard?pattern={title}&{meta}", ws_id),
+    )
+    fields = _obj(body).get("fields") if code == 200 else None
+    if not fields:
+        print(f"    {title} -> field refresh skipped (HTTP {code}, index may have no data yet)")
+        return
+    upd_code, _ = req(
+        "PUT",
+        api(f"/api/saved_objects/index-pattern/{ip_id}", ws_id),
+        {"attributes": {"fields": json.dumps(fields)}},
+    )
+    print(f"    {title} -> cached {len(fields)} fields (HTTP {upd_code})")
+
+
 # Step 5: Correlations
 
 def create_correlation(
@@ -318,6 +347,15 @@ def main() -> None:
     traces_ip_id = create_index_pattern("otel-v1-apm-span*", "endTime", "traces", None, ws_id)
     svcmap_ip_id = create_index_pattern("otel-v2-apm-service-map*", "timestamp", None, None, ws_id)
     print(f"    Index pattern IDs: traces={traces_ip_id} logs={logs_ip_id} svcmap={svcmap_ip_id}")
+
+    # Populate each pattern's field cache so Discover can resolve timeFieldName.
+    for ip_id, title in (
+        (logs_ip_id, "logs-otel-v1*"),
+        (traces_ip_id, "otel-v1-apm-span*"),
+        (svcmap_ip_id, "otel-v2-apm-service-map*"),
+    ):
+        if ip_id:
+            refresh_index_pattern_fields(ip_id, title, ws_id)
 
     # Step 5 — correlations
     print("==> Creating trace-to-logs correlation...")
