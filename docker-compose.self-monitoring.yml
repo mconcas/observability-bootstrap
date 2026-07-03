@@ -69,11 +69,3 @@ services:
     depends_on:
       fluent-bit:
         condition: service_started
-
-  service-map-enricher:
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        fluentd-async: "true"
-        tag: docker.service-map-enricher

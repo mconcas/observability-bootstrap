@@ -32,17 +32,41 @@ certs once (output goes to the gitignored `opensearch/certs/`):
 scripts/gen-certs.sh
 ```
 
-### Vanilla (default)
+### Configurations
+
+The stack is deployed as one of several named **configurations**. Each is a set
+of docker-compose overlay files layered on top of the bare base
+(`docker-compose.yml`). The `deploy.sh` wrapper picks the right files for you;
+any extra arguments are forwarded straight to `docker compose` (default: `up -d`).
+
+| Configuration     | Compose files                                                              | What it adds                                                                 |
+| ----------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `bare`            | `docker-compose.yml`                                                        | Nothing — the most vanilla stack, **no initialization script**.              |
+| `default`         | `+ docker-compose.init.yml`                                                 | One-shot Dashboards init: registers the Prometheus data source + index patterns. |
+| `self-monitoring` | `+ docker-compose.init.yml + docker-compose.self-monitoring.yml`           | The stack observes itself (ships its own logs + scrapes its own metrics).     |
 
 ```bash
-docker compose up -d
+./deploy.sh bare                  # most vanilla — base only, no init
+./deploy.sh default               # + Dashboards init (data source + index patterns)
+./deploy.sh self-monitoring       # + the stack observes itself
+./deploy.sh self-monitoring down  # any compose subcommand passes through
 ```
 
 Log in to Dashboards at <http://localhost:5601> with `admin` / the
 `OPENSEARCH_PASSWORD` from `.env`.
 
+Add a new configuration by dropping a `docker-compose.<name>.yml` overlay and
+giving it a `case` entry in `deploy.sh`.
+
+### `bare` — the most vanilla configuration
+
+```bash
+./deploy.sh bare
+```
+
 The stack runs ready to ingest **external** telemetry but injects **none of its
-own**:
+own** and runs **no initialization script** (no data sources or index patterns
+are pre-registered in Dashboards):
 
 - **OTLP** traces/metrics/logs on `:4317` (gRPC) and `:4318` (HTTP) → otel-collector
 - **InfoLogger** logs on the fluent-bit syslog unix socket
@@ -53,24 +77,34 @@ In this mode no component ships its container logs into the pipeline, and
 Prometheus does not scrape the stack's own components — so the only data you see
 is what your applications send.
 
-### With self-monitoring (the stack observes itself)
+### `default` — bare + Dashboards init
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.self-monitoring.yml up -d
+./deploy.sh default
 ```
 
-This overlay re-enables self-instrumentation:
+Adds the one-shot `opensearch-dashboards-init` container (`docker-compose.init.yml`),
+which registers the Prometheus data source and the index patterns in OpenSearch
+Dashboards so the UI is usable out of the box.
+
+### `self-monitoring` — the stack observes itself
+
+```bash
+./deploy.sh self-monitoring
+```
+
+On top of `default` this overlay re-enables self-instrumentation:
 
 - every component ships its container logs to fluent-bit via the Docker `fluentd`
   logging driver;
 - Prometheus scrapes the stack's own metrics (`prometheus`, `otel-collector`,
   `data-prepper`) by mounting `prometheus/prometheus.self-monitoring.yml` instead
-  of the vanilla `prometheus/prometheus.yml`.
+  of the bare `prometheus/prometheus.yml`.
 
 It is also what generates the self-traffic that the `scripts/validate-*.sh`
-checks assert on, so run validation with this overlay active:
+checks assert on, so run validation with this configuration active:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.self-monitoring.yml up -d
+./deploy.sh self-monitoring
 scripts/validate-all.sh
 ```

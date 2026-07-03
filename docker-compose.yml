@@ -1,11 +1,17 @@
-# Vanilla default: the stack runs ready to ingest EXTERNAL telemetry (OTLP on
-# 4317/4318, InfoLogger on the fluent-bit syslog socket) but injects none of its
-# own. No component ships its container logs to fluent-bit, and Prometheus does
-# not scrape the stack's own components.
+# Bare base: the most vanilla configuration. The stack runs ready to ingest
+# EXTERNAL telemetry (OTLP on 4317/4318, InfoLogger on the fluent-bit syslog
+# socket) but injects none of its own and runs NO initialization script — no
+# data sources or index patterns are pre-registered in Dashboards. No component
+# ships its container logs to fluent-bit, and Prometheus does not scrape the
+# stack's own components.
 #
-# To re-enable the stack's self-instrumentation (container logs + self-scrapes),
-# layer the overlay on top:
-#   docker compose -f docker-compose.yml -f docker-compose.self-monitoring.yml up -d
+# Deploy a named configuration with the wrapper, which layers the right overlays:
+#   ./deploy.sh bare              # this file only (no init, no self-monitoring)
+#   ./deploy.sh default           # + docker-compose.init.yml (Dashboards init)
+#   ./deploy.sh self-monitoring   # + the stack observes itself
+#
+# Or layer the overlays by hand:
+#   docker compose -f docker-compose.yml -f docker-compose.init.yml up -d
 services:
   fluent-bit:
     image: fluent/fluent-bit:${FLUENTBIT_VERSION}
@@ -25,7 +31,7 @@ services:
     image: ${OPENSEARCH_DOCKER_REPO}/opensearch:${OPENSEARCH_VERSION}
     container_name: opensearch
     environment:
-      - "OPENSEARCH_JAVA_OPTS=-Xms8g -Xmx8g"
+      - "OPENSEARCH_JAVA_OPTS=-Xms4g -Xmx4g"
       # Security plugin stays enabled, but we own every bit of its config: skip
       # the bundled demo installer entirely (no auto-generated certs, no
       # auto-written opensearch.yml). Certs come from scripts/gen-certs.sh and
@@ -121,24 +127,6 @@ services:
         condition: service_healthy
       fluent-bit:
         condition: service_started
-
-  # One-shot init container: registers Prometheus data source + index patterns in OSD
-  # Uses python:3-alpine because we need both curl and python3 for JSON parsing.
-  opensearch-dashboards-init:
-    image: python:3-alpine
-    container_name: opensearch-dashboards-init
-    entrypoint: ["python3", "/init-datasource.py"]
-    environment:
-      # The OSD API now requires authentication; the init script reads these.
-      - OSD_USERNAME=admin
-      - "OSD_PASSWORD=${OPENSEARCH_PASSWORD}"
-    volumes:
-      - ./opensearch-dashboards/init-datasource.sh:/init-datasource.sh:ro
-      - ./opensearch-dashboards/init-datasource.py:/init-datasource.py:ro
-    depends_on:
-      opensearch-dashboards:
-        condition: service_started
-    restart: "no"
 
 networks:
   default:

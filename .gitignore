@@ -3,3 +3,4 @@ dpl-config.json
 imgui.ini
 memory
 opensearch/certs/
+__pycache__/

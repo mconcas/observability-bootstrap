@@ -1,0 +1,26 @@
+# Init overlay — adds the one-shot Dashboards bootstrap on top of the bare base.
+# It registers the Prometheus data source and the index patterns in OpenSearch
+# Dashboards so the UI is usable out of the box. The bare base deliberately runs
+# no init at all; layer this overlay when you want the pre-wired Dashboards.
+#
+# Usage (or use ./deploy.sh default):
+#   docker compose -f docker-compose.yml -f docker-compose.init.yml up -d
+
+services:
+  # One-shot init container: registers Prometheus data source + index patterns in OSD
+  # Uses python:3-alpine because we need both curl and python3 for JSON parsing.
+  opensearch-dashboards-init:
+    image: python:3-alpine
+    container_name: opensearch-dashboards-init
+    entrypoint: ["python3", "/init-datasource.py"]
+    environment:
+      # The OSD API now requires authentication; the init script reads these.
+      - OSD_USERNAME=admin
+      - "OSD_PASSWORD=${OPENSEARCH_PASSWORD}"
+    volumes:
+      - ./opensearch-dashboards/init-datasource.sh:/init-datasource.sh:ro
+      - ./opensearch-dashboards/init-datasource.py:/init-datasource.py:ro
+    depends_on:
+      opensearch-dashboards:
+        condition: service_started
+    restart: "no"
