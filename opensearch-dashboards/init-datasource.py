@@ -34,7 +34,19 @@ def _obj(val: Any) -> JsonObj:
     return cast(JsonObj, val) if isinstance(val, dict) else {}
 
 OSD_URL = "http://opensearch-dashboards:5601"
+# OpenSearch itself (port 9200) — the log index template is PUT here directly,
+# not through Dashboards. Same admin Basic-auth credentials as OSD.
+OS_URL = "http://opensearch:9200"
 PROM_NAME = "prometheus"
+
+# Canonical mapping for the logs index. Historically Data Prepper's
+# log-analytics-plain sink created this template; the sink now targets a single
+# fixed index (data-prepper/pipelines.yml) and no longer manages a template, so
+# the bootstrap owns it here. Without it a fresh cluster gives the logs index
+# dynamic mappings — e.g. attributes.log_uid as text, which is not aggregatable
+# and breaks the deterministic-_id dedup checks (scripts/check-duplicate-logs.sh).
+LOG_TEMPLATE_NAME = "logs-otel-v1-index-template"
+LOG_TEMPLATE_FILE = "/logs-otel-v1-index-template.json"
 
 # OSD now sits behind HTTP Basic auth (security plugin). Build the header once.
 _OSD_USER = os.environ.get("OSD_USERNAME", "")
@@ -99,6 +111,29 @@ def wait_for_osd() -> None:
         print("    still waiting...")
         time.sleep(5)
     print("==> OSD is up.")
+
+
+# Step 0: Log index template (applied to OpenSearch, before any log docs land)
+
+def create_log_index_template() -> None:
+    """PUT the logs-otel-v1-* index template into OpenSearch (idempotent).
+
+    Runs before the index patterns so a fresh cluster has the correct field
+    mappings in place when Data Prepper creates logs-otel-v1-historical. PUT is
+    an upsert, so re-running the init simply refreshes the template.
+    """
+    print("==> Creating log index template in OpenSearch...")
+    try:
+        with open(LOG_TEMPLATE_FILE) as f:
+            template = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"    WARNING: could not read {LOG_TEMPLATE_FILE}: {e}")
+        return
+    code, body = req("PUT", f"{OS_URL}/_template/{LOG_TEMPLATE_NAME}", template)
+    if code == 200:
+        print(f"    {LOG_TEMPLATE_NAME} -> applied")
+    else:
+        print(f"    WARNING: HTTP {code} — {body}")
 
 
 # Step 1: Workspace
@@ -320,6 +355,9 @@ def create_correlation(
 
 def main() -> None:
     wait_for_osd()
+
+    # Step 0 — log index template (OSD being up implies OpenSearch is up)
+    create_log_index_template()
 
     # Step 1
     ws_id = find_or_create_workspace()

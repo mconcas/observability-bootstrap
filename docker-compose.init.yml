@@ -20,6 +20,7 @@ services:
     volumes:
       - ./opensearch-dashboards/init-datasource.sh:/init-datasource.sh:ro
       - ./opensearch-dashboards/init-datasource.py:/init-datasource.py:ro
+      - ./opensearch/logs-otel-v1-index-template.json:/logs-otel-v1-index-template.json:ro
     depends_on:
       opensearch-dashboards:
         condition: service_started

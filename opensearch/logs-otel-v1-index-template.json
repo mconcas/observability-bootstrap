@@ -1,0 +1,58 @@
+{
+  "index_patterns": ["logs-otel-v1-*"],
+  "version": 2,
+  "settings": {
+    "index": {
+      "number_of_shards": 2,
+      "number_of_replicas": 0
+    }
+  },
+  "mappings": {
+    "_source": { "enabled": true },
+    "date_detection": false,
+    "dynamic_templates": [
+      { "long_resource_attributes":   { "path_match": "resource.attributes.*",        "match_mapping_type": "long",   "mapping": { "type": "long" } } },
+      { "double_resource_attributes": { "path_match": "resource.attributes.*",        "match_mapping_type": "double", "mapping": { "type": "double" } } },
+      { "string_resource_attributes": { "path_match": "resource.attributes.*",        "match_mapping_type": "string", "mapping": { "type": "keyword", "ignore_above": 256 } } },
+      { "long_scope_attributes":      { "path_match": "instrumentationScope.attributes.*", "match_mapping_type": "long",   "mapping": { "type": "long" } } },
+      { "double_scope_attributes":    { "path_match": "instrumentationScope.attributes.*", "match_mapping_type": "double", "mapping": { "type": "double" } } },
+      { "string_scope_attributes":    { "path_match": "instrumentationScope.attributes.*", "match_mapping_type": "string", "mapping": { "type": "keyword", "ignore_above": 256 } } },
+      { "long_attributes":            { "path_match": "attributes.*",                 "match_mapping_type": "long",   "mapping": { "type": "long" } } },
+      { "double_attributes":          { "path_match": "attributes.*",                 "match_mapping_type": "double", "mapping": { "type": "double" } } },
+      { "string_attributes":          { "path_match": "attributes.*",                 "match_mapping_type": "string", "mapping": { "type": "keyword", "ignore_above": 256 } } }
+    ],
+    "properties": {
+      "severity": {
+        "type": "object",
+        "properties": {
+          "number": { "type": "integer" },
+          "text":   { "type": "keyword", "ignore_above": 32 }
+        }
+      },
+      "traceId": { "type": "keyword", "ignore_above": 32 },
+      "spanId":  { "type": "keyword", "ignore_above": 16 },
+      "instrumentationScope": {
+        "type": "object",
+        "properties": {
+          "name":                   { "type": "keyword", "ignore_above": 128 },
+          "droppedAttributesCount": { "type": "integer" },
+          "version":                { "type": "keyword", "ignore_above": 64 },
+          "schemaUrl":              { "type": "keyword", "ignore_above": 256 }
+        }
+      },
+      "@timestamp": { "type": "date_nanos" },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "droppedAttributesCount": { "type": "integer" },
+          "schemaUrl":              { "type": "keyword", "ignore_above": 256 }
+        }
+      },
+      "flags":                  { "type": "long" },
+      "droppedAttributesCount": { "type": "integer" },
+      "time":         { "type": "date_nanos" },
+      "body":         { "type": "text" },
+      "observedTime": { "type": "object" }
+    }
+  }
+}
