@@ -7,10 +7,22 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
+  # Absolute limits (not percentage): limit_percentage reads the HOST's total
+  # RAM, which on this co-located, swapless box means the limiter wouldn't trip
+  # until otel reached ~11g — useless as a guardrail. Cap in absolute MiB so it
+  # applies backpressure well before the host OOMs. Keep the container mem_limit
+  # (docker-compose.yml) comfortably above spike_limit for headroom.
   memory_limiter:
     check_interval: 5s
-    limit_percentage: 80
-    spike_limit_percentage: 25 # sudden bursts
+    # Sized for the 2g container (docker-compose.yml). limit_mib is the soft cap
+    # at which the collector REFUSES incoming data; it must track the container
+    # size or the collector rejects most batches while sitting well under its
+    # real limit (700 in a 2g box refused data almost continuously during bulk
+    # replay). Hard trip = limit_mib + spike_limit_mib = 1656, leaving ~390 MiB
+    # headroom below the 3072 container ceiling for Go RSS overshoot
+    # (hard trip = limit_mib + spike_limit_mib = 2600).
+    limit_mib: 2200
+    spike_limit_mib: 400 # sudden bursts
   batch:
     timeout: 10s
     send_batch_size: 1024
@@ -116,14 +128,14 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [resourcedetection, transform/peer_service, memory_limiter, batch]
+      processors: [memory_limiter, resourcedetection, transform/peer_service, batch]
       exporters: [otlp_grpc/data-prepper, spanmetrics]
     metrics:
       receivers: [otlp, spanmetrics]
-      processors: [resourcedetection, memory_limiter, batch]
+      processors: [memory_limiter, resourcedetection, batch]
       exporters: [otlp_http/prometheus]
       # exporters: [otlp_http/prometheus, otlp_grpc/data-prepper]
     logs:
       receivers: [otlp]
-      processors: [resourcedetection, transform/flatten_scope, transform/logs_service, groupbyattrs/logs, memory_limiter, batch]
+      processors: [memory_limiter, resourcedetection, transform/flatten_scope, transform/logs_service, groupbyattrs/logs, batch]
       exporters: [otlp_grpc/data-prepper]
