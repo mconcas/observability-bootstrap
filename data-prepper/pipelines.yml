@@ -31,7 +31,14 @@ otel-logs-pipeline:
         # interpolate env vars here, so this must match OPENSEARCH_PASSWORD in .env.
         username: "admin"
         password: "MyStr0ng!Pass#2024"
-        index_type: log-analytics-plain
+        # Single fixed index (NOT the log-analytics-plain rollover alias). This
+        # is a static, self-managed historical archive: because there is only
+        # one index, the deterministic _id below makes replays OVERWRITE in
+        # place. The old rollover setup duplicated across backing indices on
+        # every replay — see scripts/reindex-historical-logs.sh. The name still
+        # matches the logs-otel-v1-index-template (mappings) and the OSD
+        # logs-otel-v1* index pattern.
+        index: "logs-otel-v1-historical"
         # Deterministic _id from the content fingerprint the collector computes
         # (otel-collector/config.yml, transform/logs_service). A replayed log
         # record overwrites its prior copy instead of creating a duplicate.
